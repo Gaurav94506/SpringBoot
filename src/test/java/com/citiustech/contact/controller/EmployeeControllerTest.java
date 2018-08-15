@@ -1,5 +1,6 @@
 package com.citiustech.contact.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Before;
@@ -13,10 +14,9 @@ import org.skyscreamer.jsonassert.JSONAssert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.Mockito.when;   // ...or...
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -34,11 +35,8 @@ import com.citiustech.contact.repository.AddressRepository;
 import com.citiustech.contact.repository.EmployeeRepository;
 import com.citiustech.contact.service.EmployeeService;
 
-import ch.qos.logback.core.status.Status;
-import net.minidev.json.JSONArray;
 
 @RunWith(SpringRunner.class)
-//@WebMvcTest(EmployeeController.class)
 @WebMvcTest(EmployeeController.class) 	
 @WebAppConfiguration
 public class EmployeeControllerTest {
@@ -67,60 +65,97 @@ public class EmployeeControllerTest {
     {
     	Employee emp=new Employee((long) 1,
         		new Address((long) 1,"MH",200100),
-        		"gka","SSE","java");
-    	
-    	when(empService.findAll()).thenReturn((List<Employee>) emp);
+        		"CTS","Test","java");
+    	List<Employee> lst=new ArrayList<Employee>();
+    	lst.add(emp);
+    	when(empService.findAll()).thenReturn(lst);
     	
     	mockMvc.perform(get("/employees").accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
     	
-    						
+    	RequestBuilder requestBuilder = MockMvcRequestBuilders.get(
+				"/employees").accept(
+				MediaType.APPLICATION_JSON);
+
+    	MvcResult result = mockMvc.perform(requestBuilder).andReturn();
+
+    	String expected="[{id: 1,name: CTS, designation: Test,expertise: java,adr: {id: 1,state: MH,pincode:200100} }]";
+
+		JSONAssert.assertEquals(expected, result.getResponse()
+				.getContentAsString(), false);				
+    	
     	
     	
     }
     
-    /*
-    Employee emp=new Employee((long) 1,
-    		new Address((long) 1,"MH",200100),
-    		"gka","SSE","java");
+    @Test
+    public void createEmployee() throws Exception
+    {
+    	Employee emp=new Employee((long) 1,
+        		new Address((long) 1,"MH",200100),
+        		"CTS","Test","java");
     
-    */
-    
-    
-  
-	/*@SuppressWarnings("unchecked")
-	@Test
-	public void getAllEmployees() throws Exception{
-		
-		mockMvc.perform(get("/employees"))
-					.andExpect(status().isOK())
-		
-		
-    	Mockito.when(
-    			service.findAll()).thenReturn((List<Employee>) emp);
-
-		RequestBuilder requestBuilder = MockMvcRequestBuilders.get(
-				"/employees").accept(
-				MediaType.APPLICATION_JSON);
-
-		MvcResult result = mockMvc.perform(requestBuilder).andReturn();
-
-		System.out.println(result.getResponse());
-		String expected = "{id: 1,name: gka,designation: SSE,expertise: java, adr: { id: 1, state : MH, pincode: 200100},}";
-		// {"id":"Course1","name":"Spring","description":"10 Steps, 25 Examples and 10K Students","steps":["Learn Maven","Import Project","First Example","Second Example"]}
-
-		JSONAssert.assertEquals(expected, result.getResponse()
-				.getContentAsString(), false);
-	}
-    
-    private RequestBuilder get(String string) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Configuration
-  
-    public static class TestConf {
-    	@Bean public DemoController demoController() { return new DemoController(); }
+    	String addEmpJson = "{\"id\":\"1\",\"name\":\"CTS\",\"designation\":\"Test\",\"expertise\":\"java\",\"adr\" : {\"state\":\"MH\",\"pincode\":200100}}";
+    	String expected="{id: 1,name: CTS, designation: Test,expertise: java,adr: {id: 1,state: MH,pincode:200100} }";
     	
-    }*/
+    	Mockito.when(empService.save(Mockito.any(Employee.class))).thenReturn(emp);
+    	
+    	RequestBuilder requestBuilder = MockMvcRequestBuilders.post(
+    			"/employees").accept(
+    					MediaType.APPLICATION_JSON).content(addEmpJson)
+				.contentType(MediaType.APPLICATION_JSON);
+    	
+    					
+    	MvcResult result = mockMvc.perform(requestBuilder).andReturn();
+    	
+		MockHttpServletResponse response = result.getResponse();
+		assertEquals(HttpStatus.OK.value(), response.getStatus());	
+		JSONAssert.assertEquals(expected,result.getResponse().getContentAsString() , false);	
+
+    }
+    @Test
+    public void updateEmployee() throws Exception
+    {
+    	Employee emp=new Employee((long) 1,
+        		new Address((long) 1,"MH",200100),
+        		"CTS","Test","java");
+    	String addEmpJson = "{\"id\":\"1\",\"name\":\"CTS\",\"designation\":\"Test\",\"expertise\":\"java\",\"adr\" : {\"state\":\"MH\",\"pincode\":200100}}";
+    	when(empService.findOne(emp.getId())).thenReturn(emp);
+    	 
+        mockMvc.perform(
+                put("/employees/{id}", emp.getId())               
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(addEmpJson))
+        .andExpect(status().isOk());
+
+        verify(empService, times(1)).findOne(emp.getId());
+        verify(empService, times(1)).save(emp);
+        verifyNoMoreInteractions(empService);
+    	
+    	
+	
+    }
+    @Test
+    public void deleteEmployee() throws Exception
+    {
+    	
+    	Employee emp=new Employee((long) 1,
+        		new Address((long) 1,"MH",200100),
+        		"CTS","Test","java");
+
+
+    	 when(empService.findOne(emp.getId())).thenReturn(emp);
+    	    doNothing().when(empService).delete(emp);
+    	    
+    	    mockMvc.perform(
+    	            delete("/employees/{id}", emp.getId()))
+    	            .andExpect(status().isOk());
+    	    verify(empService, times(1)).findOne(emp.getId());
+    	    verify(empService, times(1)).delete(emp);
+    	    verifyNoMoreInteractions(empService);
+    	 
+    	
+    }
+    
+    
+   
 }
